@@ -1,0 +1,29 @@
+{
+  "name": "crm-module",
+  "version": "1.0.0",
+  "description": "Portable CRM (Customer Relationship Management) for AI agents - Supabase/PostgreSQL backend",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "crm": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "node test/test.js",
+    "contacts": "node src/cli.js contacts",
+    "tasks": "node src/cli.js tasks",
+    "stats": "node src/cli.js stats"
+  },
+  "keywords": [
+    "crm",
+    "sales-pipeline",
+    "contacts",
+    "ai-agent",
+    "supabase",
+    "customer-management"
+  ],
+  "author": "AI Installer",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3"
+  }
+}
