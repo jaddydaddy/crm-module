@@ -1,169 +1,40 @@
 # CRM Module
 
-**Portable CRM (Customer Relationship Management) for AI Agents**
+**Customer Relationship Management for AI Agents**
 
-A lightweight, multi-tenant CRM system built for AI agents to manage contacts, pipelines, interactions, and tasks. Supabase/PostgreSQL backend.
-
-Built for [AI Installer](https://ai-installer-dashboard.vercel.app) client deployments.
+A drop-in CRM system that lets AI agents track contacts, manage pipelines, log interactions, and handle follow-ups. Built for [AI Installer](https://ai-installer-dashboard.vercel.app) deployments.
 
 ## Features
 
-- 🎯 **Pipeline Management**: Customizable sales stages per agent
-- 👥 **Contact Management**: Full CRUD with search, tags, custom fields
-- 💬 **Interaction Tracking**: Log calls, emails, meetings, notes
-- ✅ **Task Management**: Tasks with priorities, due dates, assignments
-- 📊 **Analytics**: Pipeline stats, activity metrics
+- 📊 **Pipeline Management**: Customizable stages, drag-and-drop ready
+- 👥 **Contact Tracking**: Companies, people, deals with full history
+- 💬 **Interaction Logging**: Calls, emails, meetings, notes
+- ✅ **Task Management**: Follow-ups with due dates and priorities
 - 🔒 **Multi-tenant**: Isolated data per agent via `agent_id`
+- 🤖 **Agent-friendly**: Built for AI agents to read/write
 
 ## Quick Start
 
-### 1. Installation
+### Installation
 
 ```bash
 npm install
 ```
 
-### 2. Supabase Setup
-
-Create a Supabase project at [supabase.com](https://supabase.com) and run the SQL schema (see below).
-
-### 3. Environment
+### Environment Setup
 
 ```bash
 # .env file
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
-CRM_AGENT_ID=my-agent  # optional, defaults to 'default'
+
+# Optional: Multi-tenant isolation
+CRM_AGENT_ID=my-agent-name
 ```
 
-### 4. Initialize Pipeline
+### Database Setup
 
-```bash
-node src/cli.js init
-```
-
-### 5. Start Using
-
-```bash
-# Add a contact
-node src/cli.js contacts create "John Doe" --email john@example.com --stage 1
-
-# List contacts
-node src/cli.js contacts list
-
-# View stats
-node src/cli.js stats
-```
-
-## CLI Reference
-
-```bash
-# Initialize default pipeline stages
-crm init
-
-# Stages
-crm stages list
-crm stages create "New Stage" --color "#ff6b6b"
-crm stages delete <id>
-
-# Contacts
-crm contacts list [--stage <id>] [--active] [--limit N]
-crm contacts get <id>
-crm contacts create "Name" [--email X] [--phone X] [--company X] [--stage <id>] [--value X]
-crm contacts update <id> [--name X] [--email X] [--stage <id>] [--value X]
-crm contacts delete <id>
-crm contacts search "query"
-crm contacts move <contact_id> <stage_id>
-
-# Interactions
-crm interactions list [--contact <id>] [--type X] [--limit N]
-crm interactions add <contact_id> <type> "content" [--by <user>] [--subject X]
-crm interactions delete <id>
-
-# Tasks
-crm tasks list [--pending] [--overdue] [--contact <id>]
-crm tasks add "Task title" [--contact <id>] [--due "2024-03-15"] [--priority high]
-crm tasks complete <id>
-crm tasks delete <id>
-
-# Stats
-crm stats pipeline
-crm stats activity [--days 30]
-crm stats all
-```
-
-## Programmatic Usage
-
-```javascript
-import { CRM } from './src/index.js';
-
-const crm = new CRM({
-  agentId: 'my-agent'  // or set CRM_AGENT_ID env var
-});
-
-// Initialize pipeline (if needed)
-await crm.initializeDefaultStages();
-
-// Stages
-const stages = await crm.listStages();
-await crm.createStage({ name: 'Discovery', color: '#6366f1' });
-
-// Contacts
-const contact = await crm.createContact({
-  name: 'Jane Smith',
-  email: 'jane@example.com',
-  company: 'Acme Corp',
-  stageId: 1,
-  dealValue: 15000,
-  tags: ['enterprise', 'priority']
-});
-
-const contacts = await crm.listContacts({ isActive: true });
-const results = await crm.searchContacts('jane');
-await crm.moveStage(contact.id, 3);  // Move to stage 3
-await crm.markLost(contact.id, 'Budget constraints');
-
-// Interactions
-await crm.addInteraction({
-  contactId: contact.id,
-  type: 'call',
-  subject: 'Discovery call',
-  content: 'Discussed their needs...',
-  createdBy: 'agent-iris'
-});
-
-// Convenience methods
-await crm.addNote(contact.id, 'Follow up next week', 'agent-iris');
-await crm.logCall(contact.id, {
-  subject: 'Follow-up',
-  content: 'They are ready to proceed',
-  createdBy: 'agent-iris',
-  duration: 1800
-});
-
-// Tasks
-const task = await crm.addTask({
-  title: 'Send proposal',
-  contactId: contact.id,
-  dueAt: new Date('2024-03-15').toISOString(),
-  priority: 'high'
-});
-
-await crm.completeTask(task.id);
-const overdue = await crm.getOverdueTasks();
-
-// Stats
-const stats = await crm.getStats();
-console.log(stats.pipeline.totalValue);  // Total deal value
-console.log(stats.activity.interactions.total);  // Activity count
-
-// Cleanup
-crm.close();
-```
-
-## Supabase SQL Schema
-
-Run this in your Supabase SQL editor:
+Run this SQL in your Supabase SQL editor:
 
 ```sql
 -- Pipeline stages (customizable per agent)
@@ -176,7 +47,7 @@ create table crm_stages (
   created_at timestamptz default now()
 );
 
--- Contacts
+-- Contacts (people or companies)
 create table crm_contacts (
   id serial primary key,
   agent_id text not null default 'default',
@@ -185,7 +56,7 @@ create table crm_contacts (
   phone text,
   company text,
   role text,
-  stage_id integer references crm_stages(id),
+  stage_id integer references crm_stages(id) on delete set null,
   stage_entered_at timestamptz default now(),
   source text,
   source_detail text,
@@ -201,7 +72,7 @@ create table crm_contacts (
   last_contact_at timestamptz
 );
 
--- Interactions
+-- Interactions (every touchpoint)
 create table crm_interactions (
   id serial primary key,
   agent_id text not null default 'default',
@@ -217,7 +88,7 @@ create table crm_interactions (
   created_at timestamptz default now()
 );
 
--- Tasks
+-- Tasks/Follow-ups
 create table crm_tasks (
   id serial primary key,
   agent_id text not null default 'default',
@@ -233,99 +104,217 @@ create table crm_tasks (
 );
 
 -- Indexes for performance
-create index idx_stages_agent on crm_stages(agent_id);
-create index idx_contacts_agent on crm_contacts(agent_id);
-create index idx_contacts_stage on crm_contacts(stage_id);
-create index idx_contacts_active on crm_contacts(agent_id, is_active);
-create index idx_interactions_agent on crm_interactions(agent_id);
-create index idx_interactions_contact on crm_interactions(contact_id);
-create index idx_tasks_agent on crm_tasks(agent_id);
-create index idx_tasks_contact on crm_tasks(contact_id);
-create index idx_tasks_due on crm_tasks(agent_id, completed, due_at);
-
--- Row Level Security (optional but recommended)
-alter table crm_stages enable row level security;
-alter table crm_contacts enable row level security;
-alter table crm_interactions enable row level security;
-alter table crm_tasks enable row level security;
-
--- Example RLS policies (adjust for your auth setup)
--- These allow all access with anon key - customize for production
-create policy "Allow all access to stages" on crm_stages for all using (true);
-create policy "Allow all access to contacts" on crm_contacts for all using (true);
-create policy "Allow all access to interactions" on crm_interactions for all using (true);
-create policy "Allow all access to tasks" on crm_tasks for all using (true);
+create index idx_crm_stages_agent on crm_stages(agent_id);
+create index idx_crm_contacts_agent on crm_contacts(agent_id);
+create index idx_crm_contacts_stage on crm_contacts(stage_id);
+create index idx_crm_contacts_assigned on crm_contacts(assigned_to);
+create index idx_crm_interactions_agent on crm_interactions(agent_id);
+create index idx_crm_interactions_contact on crm_interactions(contact_id);
+create index idx_crm_tasks_agent on crm_tasks(agent_id);
+create index idx_crm_tasks_contact on crm_tasks(contact_id);
+create index idx_crm_tasks_due on crm_tasks(due_at) where not completed;
 ```
 
-## Multi-Tenant Setup
-
-For AI Installer deployments with multiple client agents:
+### CLI Usage
 
 ```bash
-# Each agent has isolated data
-CRM_AGENT_ID=client_acme node src/cli.js contacts create "John"
-CRM_AGENT_ID=client_globex node src/cli.js contacts create "Jane"
+# Initialize default pipeline stages
+node src/cli.js init
 
-# Queries only return that agent's data
-CRM_AGENT_ID=client_acme node src/cli.js contacts list
-# Shows only John
+# Add a contact
+node src/cli.js contacts add "Acme Corp" --email john@acme.com --company Acme
 
-CRM_AGENT_ID=client_globex node src/cli.js contacts list
-# Shows only Jane
+# List contacts
+node src/cli.js contacts list
+node src/cli.js contacts list --stage 1
+node src/cli.js contacts list --assigned-to louis
+
+# Search contacts
+node src/cli.js contacts search "acme"
+
+# Move contact to different stage
+node src/cli.js contacts move 1 --stage 3
+
+# Add interaction
+node src/cli.js interactions add 1 --type call --content "Discussed pricing"
+
+# Add a note
+node src/cli.js interactions note 1 "Interested in premium plan"
+
+# Add a task
+node src/cli.js tasks add "Follow up with Acme" --contact 1 --due "2026-02-20"
+
+# Complete a task
+node src/cli.js tasks complete 1
+
+# List overdue tasks
+node src/cli.js tasks list --overdue
+
+# Get pipeline stats
+node src/cli.js stats
 ```
 
-All agents share the same Supabase project, but data is fully isolated by `agent_id`.
+### Programmatic Usage
 
-## Interaction Types
+```javascript
+import { CRM } from './src/index.js';
 
-Suggested interaction types (not enforced):
+// Initialize
+const crm = new CRM({
+  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseKey: process.env.SUPABASE_KEY,
+  agentId: 'my-agent'  // Optional: defaults to CRM_AGENT_ID or 'default'
+});
 
-| Type | Description |
-|------|-------------|
-| `call` | Phone call |
-| `email` | Email sent/received |
-| `meeting` | In-person or video meeting |
-| `note` | Internal note |
-| `message` | Chat/SMS message |
-| `demo` | Product demonstration |
-| `proposal` | Proposal sent |
+// Initialize default stages (run once)
+await crm.initializeDefaultStages();
 
-## Task Priorities
+// Create a contact
+const contact = await crm.createContact({
+  name: 'Acme Corporation',
+  email: 'john@acme.com',
+  company: 'Acme',
+  role: 'CEO',
+  source: 'referral',
+  dealValue: 5000
+});
 
-| Priority | Use Case |
-|----------|----------|
-| `low` | Nice to have, no urgency |
-| `medium` | Normal priority (default) |
-| `high` | Urgent, needs attention |
+// Move through pipeline
+await crm.moveStage(contact.id, 2);  // Move to stage 2
+
+// Log interactions
+await crm.addNote(contact.id, 'Initial call went well', 'iris');
+await crm.logCall(contact.id, {
+  subject: 'Discovery call',
+  content: 'Discussed their needs. Interested in AI automation.',
+  createdBy: 'louis',
+  duration: 30
+});
+
+// Create follow-up task
+await crm.addTask({
+  title: 'Send proposal to Acme',
+  contactId: contact.id,
+  dueAt: '2026-02-20T10:00:00Z',
+  assignedTo: 'louis',
+  priority: 'high'
+});
+
+// Search contacts
+const results = await crm.searchContacts('acme');
+
+// Get pipeline overview
+const stats = await crm.getPipelineStats();
+
+// List overdue tasks
+const overdue = await crm.getOverdueTasks();
+
+// Close connection
+crm.close();
+```
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    CRM Class                         │
-│  (contacts, stages, interactions, tasks, stats)     │
-└───────────────────────┬─────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│                Database Layer                        │
-│           (Supabase JS Client)                      │
-└───────────────────────┬─────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│                   Supabase                          │
-│        (PostgreSQL + Row Level Security)            │
+│                    CRM Module                        │
+├─────────────────────────────────────────────────────┤
+│  Stages    │  Contacts   │ Interactions │  Tasks    │
+│  --------  │  ---------  │ ------------ │ -------   │
+│  Pipeline  │  Companies  │ Calls        │ Follow-up │
+│  stages    │  People     │ Emails       │ Reminders │
+│            │  Deals      │ Meetings     │ To-dos    │
+│            │             │ Notes        │           │
 └─────────────────────────────────────────────────────┘
+                          │
+                          ▼
+              ┌───────────────────────┐
+              │       Supabase        │
+              │  (Multi-tenant DB)    │
+              │  agent_id isolation   │
+              └───────────────────────┘
 ```
 
-## Environment Variables
+## Multi-Tenant Setup
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_KEY` | Supabase anon key | Yes |
-| `CRM_AGENT_ID` | Multi-tenant agent ID | No (defaults to 'default') |
+For deployments with multiple agents/clients:
+
+```bash
+# Each agent gets isolated data
+CRM_AGENT_ID=client_acme node src/cli.js contacts list
+CRM_AGENT_ID=client_globex node src/cli.js contacts list
+```
+
+All agents can share the same Supabase project - data is isolated by `agent_id`.
+
+## Interaction Types
+
+| Type | Use Case |
+|------|----------|
+| `call` | Phone calls, voice chats |
+| `email` | Email correspondence |
+| `meeting` | In-person or video meetings |
+| `note` | Internal notes, observations |
+| `demo` | Product demonstrations |
+| `proposal` | Sent proposals/quotes |
+
+## Pipeline Stages
+
+Default stages (customizable):
+
+1. **Lead** - New potential customer
+2. **Contacted** - Initial outreach made
+3. **Qualified** - Confirmed fit/interest
+4. **Proposal** - Proposal/quote sent
+5. **Negotiation** - Terms being discussed
+6. **Won** - Deal closed successfully
+
+## Configuration
+
+| Env Variable | Description | Default |
+|--------------|-------------|---------|
+| `SUPABASE_URL` | Supabase project URL | Required |
+| `SUPABASE_KEY` | Supabase anon key | Required |
+| `CRM_AGENT_ID` | Multi-tenant agent ID | `default` |
+
+## API Reference
+
+### Stages
+- `listStages()` - Get all pipeline stages
+- `createStage({ name, position, color })` - Create a stage
+- `reorderStages([ids])` - Reorder stages
+- `deleteStage(id)` - Delete a stage
+
+### Contacts
+- `listContacts(options)` - List with filters
+- `getContact(id)` - Get single contact
+- `createContact(data)` - Create contact
+- `updateContact(id, updates)` - Update contact
+- `moveStage(id, stageId)` - Move to stage
+- `markLost(id, reason)` - Mark as lost
+- `searchContacts(query)` - Search contacts
+- `deleteContact(id)` - Delete contact
+
+### Interactions
+- `listInteractions(options)` - List interactions
+- `addInteraction(data)` - Add interaction
+- `addNote(contactId, content, by)` - Quick note
+- `logCall(contactId, data)` - Log a call
+- `logEmail(contactId, data)` - Log an email
+- `deleteInteraction(id)` - Delete interaction
+
+### Tasks
+- `listTasks(options)` - List tasks
+- `addTask(data)` - Add task
+- `completeTask(id)` - Mark complete
+- `uncompleteTask(id)` - Reopen task
+- `getOverdueTasks()` - Get overdue tasks
+- `deleteTask(id)` - Delete task
+
+### Stats
+- `getPipelineStats()` - Pipeline overview
+- `getActivityStats(days)` - Activity metrics
+- `getStats()` - Combined stats
 
 ## License
 
